@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Study Pet Forest</title>
+    <style>
+        :root {
+            --neon-cyan: #0ff;
+            --neon-pink: #f0f;
+            --dark-bg: #0a0a12;
+            --cyber-dark: #1a1a2f;
+            --cyber-border: rgba(0, 255, 255, 0.3);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(45deg, #000428, #004e92);
+            color: var(--neon-cyan);
+            min-height: 100vh;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 30, 0.9);
+            padding: 20px;
+            border: 1px solid var(--cyber-border);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 15px var(--neon-cyan);
+            width: 300px;
+        }
+
+        .pet {
+            position: absolute;
+            font-size: 40px;
+            cursor: pointer;
+            filter: drop-shadow(0 0 5px var(--neon-cyan));
+            transition: all 0.3s ease;
+        }
+
+        #store {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 30, 0.9);
+            padding: 20px;
+            border: 1px solid var(--cyber-border);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 15px var(--neon-pink);
+            width: 250px;
+        }
+
+        button {
+            background: var(--cyber-dark);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 10px 15px;
+            margin: 8px 0;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: var(--neon-cyan);
+            color: var(--dark-bg);
+            box-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        input {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 255, 255, 0.1);
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+            width: 0%;
+            transition: width 1s linear;
+        }
+
+        .pet-info {
+            position: absolute;
+            background: rgba(0, 0, 30, 0.9);
+            border: 1px solid var(--neon-pink);
+            padding: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-shadow: 0 0 5px black;
+            clip-path: polygon(0 0, 100% 0, 100% 75%, 90% 75%, 90% 100%, 10% 100%, 10% 75%, 0 75%);
+        }
+
+        .pet:hover .pet-info {
+            opacity: 1;
+        }
+
+        h2 {
+            color: var(--neon-pink);
+            text-shadow: 0 0 10px var(--neon-pink);
+            border-bottom: 2px solid var(--neon-cyan);
+            padding-bottom: 10px;
+            margin: 0 0 15px 0;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(0deg, 
+                rgba(0, 255, 255, 0.1) 1px, 
+                transparent 1px);
+            background-size: 100% 3px;
+            animation: scanline 5s linear infinite;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h2>Study Timer</h2>
+        <input type="number" id="studyMinutes" min="1" value="25" placeholder="Minutes">
+        <button onclick="startStudySession()">Start Studying</button>
+        <div class="progress-bar">
+            <div class="progress" id="progress"></div>
+        </div>
+        <div id="timerDisplay">00:00</div>
+        <div id="coinCounter">Coins: 0</div>
+    </div>
+
+    <div id="store">
+        <h2>Pet Store</h2>
+        <div id="petOptions"></div>
+    </div>
+
+    <div class="pet-info">
+        ${petData.name} (${petData.type})<br>
+        Lv: ${petData.level}<br>
+        EXP: ${petData.exp}/${getRequiredExp(petData.level)}<br>
+        Next Evolution: ${petData.evolutionStage < petData.emojiPath.length - 1 ? 
+            `Lv ${(petData.evolutionStage + 1) * 3}` : 'MAX'}
+    </div>
+
+    <div id="petContainer"></div>
+
+    <script>
+        let coins = parseInt(localStorage.getItem('coins')) || 50;
+        let currentTimer = null;
+        let pets = JSON.parse(localStorage.getItem('pets')) || [];
+        
+        const petOptions = [
+            { name: "Dog", emoji: ["🐶"], cost: 20 },
+            { name: "Cat", emoji: ["🐱"], cost: 20 },
+            { name: "Rabbit", emoji: ["🐰"], cost: 20 },
+            { name: "Bear", emoji: ["🐻"], cost: 20 },
+            { name: "Penguin", emoji: ["🐧"], cost: 20 }
+        ];
+
+        function initStore() { /* ... (same as before) ... */ }
+
+        function buyPet(petType) {
+            if (coins >= petType.cost) {
+                const petName = prompt("Name your pet:");
+                if (!petName) return;
+                
+                const newPet = {
+                    type: petType.name,
+                    name: petName,
+                    level: 1,
+                    exp: 0,
+                    evolutionStage: 0,
+                    emojiPath: petType.emoji
+                };
+                
+                coins -= petType.cost;
+                pets.push(newPet);
+                localStorage.setItem('pets', JSON.stringify(pets));
+                updateCoinDisplay();
+                createPet(newPet);
+            } else {
+                alert(`You need ${petType.cost - coins} more coins!`);
+            }
+        }
+
+        function createPet(petData) {
+            const petElement = document.createElement('div');
+            petElement.className = 'pet';
+            petElement.innerHTML = `
+                ${petData.emojiPath[petData.evolutionStage]}
+                <div class="pet-info">
+                    ${petData.name}<br>
+                    Lv: ${petData.level}<br>
+                    EXP: ${petData.exp}/${getRequiredExp(petData.level)}
+                </div>
+            `;
+
+            // Position and animation
+            petElement.style.left = `${Math.random() * (window.innerWidth - 50)}px`;
+            petElement.style.top = `${Math.random() * (window.innerHeight - 50)}px`;
+            
+            // Click interaction
+            petElement.addEventListener('click', () => {
+                petElement.style.transform = 'scale(1.2)';
+                setTimeout(() => petElement.style.transform = '', 200);
+            });
+
+            document.getElementById('petContainer').appendChild(petElement);
+        }
+
+        function getRequiredExp(level) {
+            return level * 100;
+        }
+
+        function gainExp(minutesStudied) {
+            pets.forEach(pet => {
+                pet.exp += minutesStudied * 10; // 10 EXP per minute
+                while (pet.exp >= getRequiredExp(pet.level)) {
+                    pet.exp -= getRequiredExp(pet.level);
+                    pet.level++;
+                    
+                    // Check evolution
+                    const maxEvolution = pet.emojiPath.length - 1;
+                    if (pet.level % 3 === 0 && pet.evolutionStage < maxEvolution) {
+                        pet.evolutionStage++;
+                    }
+                }
+            });
+            
+            localStorage.setItem('pets', JSON.stringify(pets));
+            refreshPetsDisplay();
+        }
+
+        function refreshPetsDisplay() {
+            document.getElementById('petContainer').innerHTML = '';
+            pets.forEach(pet => createPet(pet));
+        }
+
+        function startStudySession() {
+            if (currentTimer) return;
+            
+            const minutes = parseInt(document.getElementById('studyMinutes').value);
+            const seconds = minutes * 60;
+            let timeLeft = seconds;
+            
+            currentTimer = setInterval(() => {
+                timeLeft--;
+                // ... (same timer logic as before) ...
+                
+                if (timeLeft <= 0) {
+                    coins += minutes;
+                    gainExp(minutes); // Add EXP to pets
+                    // ... (same cleanup logic) ...
+                }
+            }, 1000);
+        }
+
+        // Initialize store
+        function initStore() {
+            const petOptionsDiv = document.getElementById('petOptions');
+            petOptions.forEach(pet => {
+                const btn = document.createElement('button');
+                btn.innerHTML = `${pet.emoji} ${pet.name} (${pet.cost} coins)`;
+                btn.onclick = () => buyPet(pet);
+                petOptionsDiv.appendChild(btn);
+            });
+        }
+
+        function updateCoinDisplay() {
+            document.getElementById('coinCounter').tWextContent = `Coins: ${coins}`;
+            localStorage.setItem('coins', coins);
+        }
+
+        function startStudySession() {
+            if (currentTimer) return;
+            
+            const minutes = parseInt(document.getElementById('studyMinutes').value);
+            const seconds = minutes * 60;
+            let timeLeft = seconds;
+            const progress = document.getElementById('progress');
+            
+            currentTimer = setInterval(() => {
+                timeLeft--;
+                const percentage = ((seconds - timeLeft) / seconds) * 100;
+                progress.style.width = `${percentage}%`;
+                
+                // Update timer display
+                const mins = Math.floor(timeLeft / 60);
+                const secs = timeLeft % 60;
+                document.getElementById('timerDisplay').textContent = 
+                    `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(currentTimer);
+                    currentTimer = null;
+                    coins += minutes; // 1 coin per minute
+                    updateCoinDisplay();
+                    progress.style.width = '0%';
+                    document.getElementById('timerDisplay').textContent = '00:00';
+                }
+            }, 1000);
+        }
+
+        function buyPet(pet) {
+            if (coins >= pet.cost) {
+                coins -= pet.cost;
+                pets.push(pet);
+                localStorage.setItem('pets', JSON.stringify(pets));
+                updateCoinDisplay();
+                createPet(pet);
+            } else {
+                alert(`You need ${pet.cost - coins} more coins to buy ${pet.name}!`);
+            }
+        }
+
+        function createPet(pet) {
+            const petElement = document.createElement('div');
+            petElement.className = 'pet';
+            petElement.textContent = pet.emoji;
+            petElement.style.left = `${Math.random() * (window.innerWidth - 50)}px`;
+            petElement.style.top = `${Math.random() * (window.innerHeight - 50)}px`;
+            
+            petElement.addEventListener('click', () => {
+                petElement.style.transform = 'scale(1.2)';
+                setTimeout(() => petElement.style.transform = '', 200);
+            });
+
+            document.getElementById('petContainer').appendChild(petElement);
+        }
+
+        // Load existing pets
+        function loadPets() {
+            pets.forEach(pet => createPet(pet));
+        }
+
+        
+
+        // Initialize game
+        initStore();
+        updateCoinDisplay();
+        loadPets();
+
+        // Auto-save every 30 seconds
+        setInterval(() => {
+            localStorage.setItem('coins', coins);
+            localStorage.setItem('pets', JSON.stringify(pets));
+        }, 30000);
+    </script>
+</body>
+</html>
